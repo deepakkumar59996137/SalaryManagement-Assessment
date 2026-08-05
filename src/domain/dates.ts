@@ -110,21 +110,39 @@ export function startOfYear(date: IsoDate): IsoDate {
 /**
  * A source of "now", injected rather than read from the system clock.
  *
- * Every service that needs today's date takes one of these, so tests pin time
- * to a constant instead of tolerating whatever day they happen to run on.
+ * Every service that needs the current time takes one of these, so tests pin
+ * time to a constant instead of tolerating whatever day they happen to run on.
+ *
+ * `today` is a calendar date, for effective dating. `now` is an instant, for
+ * things where the moment genuinely matters — audit timestamps and session
+ * expiry. Keeping both on one interface means a service declares that it
+ * depends on the clock at all, whichever kind of time it needs.
  */
 export interface Clock {
   today(): IsoDate;
+  /** ISO 8601 instant in UTC, e.g. `2026-03-01T09:30:00.000Z`. */
+  now(): string;
 }
 
-export function fixedClock(date: IsoDate): Clock {
+export function fixedClock(date: IsoDate, timeOfDay = '00:00:00.000'): Clock {
   const pinned = assertIsoDate(date);
-  return { today: () => pinned };
+  return {
+    today: () => pinned,
+    now: () => `${pinned}T${timeOfDay}Z`,
+  };
 }
 
 export const systemClock: Clock = {
   today: () => new Date().toISOString().slice(0, 10),
+  now: () => new Date().toISOString(),
 };
+
+/** Add seconds to an ISO 8601 instant. Used for session expiry. */
+export function addSeconds(instant: string, seconds: number): string {
+  const millis = Date.parse(instant);
+  if (Number.isNaN(millis)) throw new Error(`Not a valid ISO instant: ${instant}`);
+  return new Date(millis + seconds * 1000).toISOString();
+}
 
 /** Whether an effective-dated interval covers a given date. `null` end means open. */
 export function intervalCovers(

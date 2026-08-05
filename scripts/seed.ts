@@ -9,16 +9,13 @@
  */
 
 import fs from 'node:fs';
+import { DEMO_ACCOUNT } from '../src/server/auth/demo-account';
 import { hashPassword } from '../src/server/auth/password';
 import { getConnection, runMigrations } from '../src/server/db/client';
 import { databaseDirectory, databaseFile } from '../src/server/db/paths';
 import { DEFAULT_FX_RATES, FX_SNAPSHOT_AS_OF } from '../src/domain/fx';
 import { generateDataset } from './seed/generate';
 import { AS_OF, COUNTRIES, DEPARTMENTS, JOB_LEVELS } from './seed/reference';
-
-/** Demo credentials. Printed on completion and documented in the README. */
-export const DEMO_EMAIL = process.env.SEED_HR_EMAIL ?? 'hr.manager@acme.example';
-export const DEMO_PASSWORD = process.env.SEED_HR_PASSWORD ?? 'DemoPass!2026';
 
 /**
  * A fixed salt for the seeded account only, so the whole database hashes
@@ -106,9 +103,9 @@ function seed(): void {
     `);
     const userId = Number(
       insertUser.run(
-        DEMO_EMAIL,
-        'Alex Morgan',
-        hashPassword(DEMO_PASSWORD, DEMO_SALT),
+        DEMO_ACCOUNT.email,
+        DEMO_ACCOUNT.name,
+        hashPassword(DEMO_ACCOUNT.password, { salt: DEMO_SALT }),
         'HR_MANAGER',
         SEED_TIMESTAMP,
       ).lastInsertRowid,
@@ -229,7 +226,7 @@ Seeded ${databaseFile()} in ${(elapsedMs / 1000).toFixed(2)}s
   annual payroll       $${Math.round(payrollUsd / 100).toLocaleString('en-US')}
   paid outside band    ${outsideBand.toLocaleString('en-US')}
 
-  sign in with         ${DEMO_EMAIL} / ${DEMO_PASSWORD}
+  sign in with         ${DEMO_ACCOUNT.email} / ${DEMO_ACCOUNT.password}
 `);
 }
 
