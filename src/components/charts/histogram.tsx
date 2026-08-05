@@ -47,26 +47,7 @@ export function Histogram({
 
   return (
     <div>
-      <div className="relative">
-        {/* Percentile markers sit behind the columns so they never obscure data. */}
-        {markers.map((marker) => {
-          const left = positionOf(marker.value);
-          if (left < 0 || left > 100) return null;
-
-          return (
-            <div
-              key={marker.label}
-              className="pointer-events-none absolute top-0 bottom-0 z-0 flex flex-col items-center"
-              style={{ left: `${left}%` }}
-            >
-              <span className="w-px flex-1 bg-chart-axis" aria-hidden />
-              <span className="absolute -top-1 -translate-x-1/2 rounded bg-background px-1 text-[10px] font-medium text-muted-foreground">
-                {marker.label}
-              </span>
-            </div>
-          );
-        })}
-
+      <div className="relative pt-4">
         {/* 2px surface gaps do the separating between adjacent columns —
             no borders, which would add ink that is not data. */}
         <div className="relative z-10 flex h-44 items-end gap-[2px]">
@@ -90,6 +71,32 @@ export function Histogram({
             );
           })}
         </div>
+
+        {/*
+         * Percentile markers ride ABOVE the columns.
+         *
+         * They were behind them at first, on the reasoning that annotation
+         * should never obscure data — but the median sits where the columns
+         * are tallest, so the one line most worth seeing was the one always
+         * hidden. A translucent rule reads over a bar without erasing it.
+         */}
+        {markers.map((marker) => {
+          const left = positionOf(marker.value);
+          if (left < 0 || left > 100) return null;
+
+          return (
+            <div
+              key={marker.label}
+              className="pointer-events-none absolute top-0 bottom-0 z-20 flex flex-col items-center"
+              style={{ left: `${left}%` }}
+            >
+              <span className="rounded-sm bg-background px-1 text-[10px] leading-none font-medium text-muted-foreground">
+                {marker.label}
+              </span>
+              <span className="w-px flex-1 bg-foreground/40" aria-hidden />
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-2 h-px bg-chart-grid" aria-hidden />

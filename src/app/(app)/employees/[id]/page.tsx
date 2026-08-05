@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { BandMeter, BandPositionLabel } from '@/components/shared/band-position';
 import { Money } from '@/components/shared/money';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { getDb } from '@/server/db/client';
 import { NotFoundError } from '@/server/http/errors';
 import { getCompensationHistory } from '@/server/services/compensation.service';
@@ -79,9 +79,7 @@ export default async function EmployeeDetailPage({
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Current annual base
-              </CardTitle>
+              <h2 className="text-sm font-medium text-muted-foreground">Current annual base</h2>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap items-end justify-between gap-4">
@@ -136,7 +134,7 @@ export default async function EmployeeDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Salary history</CardTitle>
+              <h2 className="text-base font-semibold">Salary history</h2>
             </CardHeader>
             <CardContent>
               <CompensationTimeline history={history} />
@@ -146,7 +144,7 @@ export default async function EmployeeDetailPage({
 
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <h2 className="text-base font-semibold">Details</h2>
           </CardHeader>
           <CardContent>
             <dl className="space-y-3 text-sm">

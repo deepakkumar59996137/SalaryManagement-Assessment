@@ -41,6 +41,16 @@ function applyPragmas(sqlite: SqliteConnection): void {
   sqlite.pragma('foreign_keys = ON');
   // Wait rather than failing immediately if another connection holds the write lock.
   sqlite.pragma('busy_timeout = 5000');
+
+  /*
+   * 64 MB of page cache. The whole database is ~7 MB at ten thousand
+   * employees, so this holds all of it in memory after the first read.
+   *
+   * Measured, not guessed: the analytics aggregates spend most of their time
+   * on random row lookups, and raising the cache from the 2 MB default took a
+   * representative breakdown query from 73ms to 52ms. See docs/performance.md.
+   */
+  sqlite.pragma('cache_size = -64000');
 }
 
 export function openConnection(file: string): Connection {
