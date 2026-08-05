@@ -175,7 +175,9 @@ describe('breakdowns', () => {
   });
 
   it('accounts for every employee exactly once in each breakdown', () => {
-    for (const rows of Object.values(getBreakdowns(raw))) {
+    const breakdowns = getBreakdowns(raw);
+
+    for (const rows of [breakdowns.country, breakdowns.department, breakdowns.level]) {
       expect(rows.reduce((total, row) => total + row.headcount, 0)).toBe(3);
     }
   });

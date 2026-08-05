@@ -90,7 +90,9 @@ export function getDistribution(db: RawDatabase, filters: AnalyticsFilters = {})
   const percentiles = getPercentiles(db, PERCENTILES, filters);
 
   const empty = overview.headcount === 0 || overview.minUsdMinor === null || overview.maxUsdMinor === null;
-  const edges = empty ? [] : histogramEdges(overview.minUsdMinor!, overview.maxUsdMinor!, 14);
+  // Ask for more buckets than are wanted: niceInterval rounds the step up to a
+  // readable number, which usually lands the real count somewhat lower.
+  const edges = empty ? [] : histogramEdges(overview.minUsdMinor!, overview.maxUsdMinor!, 20);
   const counts = edges.length > 1 ? getHistogram(db, edges, filters) : [];
 
   return {
