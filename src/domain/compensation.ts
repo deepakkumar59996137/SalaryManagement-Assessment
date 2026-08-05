@@ -14,6 +14,35 @@ export interface SalaryBand {
   readonly maxMinor: number;
 }
 
+/** Why a salary changed. Kept next to the maths so vocabulary lives in one place. */
+export const CHANGE_REASONS = [
+  'INITIAL',
+  'MERIT',
+  'PROMOTION',
+  'MARKET_ADJUSTMENT',
+  'CORRECTION',
+  'IMPORT',
+] as const;
+
+export type ChangeReasonCode = (typeof CHANGE_REASONS)[number];
+
+export const CHANGE_REASON_LABELS: Readonly<Record<ChangeReasonCode, string>> = {
+  INITIAL: 'Starting salary',
+  MERIT: 'Merit increase',
+  PROMOTION: 'Promotion',
+  MARKET_ADJUSTMENT: 'Market adjustment',
+  CORRECTION: 'Correction',
+  IMPORT: 'Bulk import',
+};
+
+/** Reasons an HR Manager can choose. INITIAL and IMPORT are set by the system. */
+export const SELECTABLE_CHANGE_REASONS = [
+  'MERIT',
+  'PROMOTION',
+  'MARKET_ADJUSTMENT',
+  'CORRECTION',
+] as const satisfies readonly ChangeReasonCode[];
+
 export type BandPosition = 'BELOW' | 'WITHIN' | 'ABOVE';
 
 /**

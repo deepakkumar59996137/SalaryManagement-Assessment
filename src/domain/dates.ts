@@ -97,6 +97,32 @@ export function maxDate(a: IsoDate, b: IsoDate): IsoDate {
   return a >= b ? a : b;
 }
 
+/**
+ * Human-readable form: `2026-03-01` becomes `1 March 2026`.
+ *
+ * Formatted in UTC and with a pinned locale, so server-rendered and
+ * client-rendered output agree and audit summaries do not read differently
+ * depending on where the reader is.
+ */
+export function formatDateLong(date: IsoDate, locale = 'en-GB'): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${assertIsoDate(date)}T00:00:00Z`));
+}
+
+/** Compact form for dense tables: `1 Mar 2026`. */
+export function formatDateShort(date: IsoDate, locale = 'en-GB'): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${assertIsoDate(date)}T00:00:00Z`));
+}
+
 /** `YYYY-MM` — the grouping key for monthly trend charts. */
 export function monthOf(date: IsoDate): string {
   return assertIsoDate(date).slice(0, 7);
