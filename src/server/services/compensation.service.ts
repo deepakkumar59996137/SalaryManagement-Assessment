@@ -13,6 +13,7 @@ import { insertAuditEntry } from '../repositories/audit.repository';
 import {
   closeInterval,
   type CompensationRow,
+  type EmployeeForRevision,
   findBandFor,
   findByExactStart,
   findEmployeeForRevision,
@@ -68,12 +69,28 @@ export interface RevisionResult {
   readonly summary: string;
 }
 
-export function reviseSalary(
+/**
+ * Everything a revision needs, validated and converted, ready to write.
+ *
+ * Separating this from the write is what lets the CSV import validate a whole
+ * file, report on it, and then apply every row inside ONE transaction — rather
+ * than opening a nested transaction per row.
+ */
+export interface PreparedRevision {
+  readonly employee: EmployeeForRevision;
+  readonly baseSalaryMinor: number;
+  readonly annualBaseUsdMinor: number;
+  readonly effectiveFrom: IsoDate;
+  readonly changeReason: ChangeReasonCode;
+  readonly note: string | null;
+}
+
+/** Validate and convert. Throws on anything that would make the write invalid. */
+export function prepareRevision(
   db: AppDatabase,
   input: RevisionInput,
-  actorUserId: number,
   clock: Clock = systemClock,
-): RevisionResult {
+): PreparedRevision {
   const employee = findEmployeeForRevision(db, input.employeeId);
   if (!employee) throw new NotFoundError('Employee');
 
@@ -103,110 +120,137 @@ export function reviseSalary(
     );
   }
 
-  const rates = findFxRates(db);
-  const annualBaseUsdMinor = toUsdMinor(baseSalaryMinor, employee.currency, rates);
-  const now = clock.now();
+  return {
+    employee,
+    baseSalaryMinor,
+    annualBaseUsdMinor: toUsdMinor(baseSalaryMinor, employee.currency, findFxRates(db)),
+    effectiveFrom: input.effectiveFrom,
+    changeReason: input.changeReason,
+    note: input.note ?? null,
+  };
+}
 
-  return db.transaction((tx) => {
-    // An existing row starting on the same day is corrected in place. Splicing
-    // a new one in would create a zero-length interval — a salary that was
-    // never true for a single day.
-    const exact = findByExactStart(tx, employee.id, input.effectiveFrom);
+/**
+ * Write a prepared revision.
+ *
+ * Must be called inside a transaction — `tx` is the handle. On its own this
+ * function can leave the history in a state that violates ADR-0002 if it
+ * throws part-way, which is exactly why it is never called outside one.
+ */
+export function commitRevision(
+  tx: AppDatabase,
+  prepared: PreparedRevision,
+  actorUserId: number,
+  now: string,
+): RevisionResult {
+  const { employee, baseSalaryMinor, annualBaseUsdMinor, effectiveFrom } = prepared;
 
-    const previous = exact ?? findIntervalCovering(tx, employee.id, input.effectiveFrom);
-    if (!previous) {
-      throw new ConflictError(
-        'No salary record covers that date, so there is nothing to revise from',
-      );
-    }
+  // An existing row starting on the same day is corrected in place. Splicing
+  // a new one in would create a zero-length interval — a salary that was
+  // never true for a single day.
+  const exact = findByExactStart(tx, employee.id, effectiveFrom);
 
-    let compensationId: number;
-    let isCurrent: boolean;
+  const previous = exact ?? findIntervalCovering(tx, employee.id, effectiveFrom);
+  if (!previous) {
+    throw new ConflictError('No salary record covers that date, so there is nothing to revise from');
+  }
 
-    if (exact) {
-      replaceCompensation(tx, exact.id, {
-        baseSalaryMinor,
-        annualBaseUsdMinor,
-        changeReason: input.changeReason,
-        note: input.note ?? null,
-        changedByUserId: actorUserId,
-      });
-      compensationId = exact.id;
-      isCurrent = exact.effectiveTo === null;
-    } else {
-      // Close the predecessor *before* inserting, so there is never a moment
-      // with two open intervals — which the partial unique index would reject.
-      closeInterval(tx, previous.id, addDays(input.effectiveFrom, -1));
+  let compensationId: number;
+  let isCurrent: boolean;
 
-      compensationId = insertCompensation(tx, {
-        employeeId: employee.id,
-        baseSalaryMinor,
-        currency: employee.currency,
-        effectiveFrom: input.effectiveFrom,
-        // The new row inherits whatever the predecessor's end was: null when
-        // splicing onto the end, or the predecessor's old end when back-dating
-        // into the middle of the history.
-        effectiveTo: previous.effectiveTo,
-        annualBaseUsdMinor,
-        changeReason: input.changeReason,
-        note: input.note ?? null,
-        changedByUserId: actorUserId,
-        createdAt: now,
-      });
-      isCurrent = previous.effectiveTo === null;
-    }
-
-    if (isCurrent) {
-      setCurrentCompensation(tx, employee.id, compensationId, now);
-    }
-
-    const change = percentChange(previous.baseSalaryMinor, baseSalaryMinor);
-    const summary = describeRevision({
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      currency: employee.currency,
-      fromMinor: previous.baseSalaryMinor,
-      toMinorAmount: baseSalaryMinor,
-      change,
-      effectiveFrom: input.effectiveFrom,
-      reason: input.changeReason,
+  if (exact) {
+    replaceCompensation(tx, exact.id, {
+      baseSalaryMinor,
+      annualBaseUsdMinor,
+      changeReason: prepared.changeReason,
+      note: prepared.note,
+      changedByUserId: actorUserId,
     });
+    compensationId = exact.id;
+    isCurrent = exact.effectiveTo === null;
+  } else {
+    // Close the predecessor *before* inserting, so there is never a moment
+    // with two open intervals — which the partial unique index would reject.
+    closeInterval(tx, previous.id, addDays(effectiveFrom, -1));
 
-    insertAuditEntry(tx, {
-      actorUserId,
-      entity: 'COMPENSATION',
-      entityId: compensationId,
-      action: 'SALARY_REVISION',
-      beforeJson: JSON.stringify({
-        baseSalaryMinor: previous.baseSalaryMinor,
-        currency: previous.currency,
-        effectiveFrom: previous.effectiveFrom,
-        effectiveTo: previous.effectiveTo,
-        changeReason: previous.changeReason,
-      }),
-      afterJson: JSON.stringify({
-        employeeId: employee.id,
-        baseSalaryMinor,
-        currency: employee.currency,
-        effectiveFrom: input.effectiveFrom,
-        annualBaseUsdMinor,
-        changeReason: input.changeReason,
-        note: input.note ?? null,
-      }),
-      summary,
-      at: now,
-    });
-
-    return {
-      compensationId,
-      previousSalaryMinor: previous.baseSalaryMinor,
-      newSalaryMinor: baseSalaryMinor,
+    compensationId = insertCompensation(tx, {
+      employeeId: employee.id,
+      baseSalaryMinor,
       currency: employee.currency,
-      percentChange: change,
-      effectiveFrom: input.effectiveFrom,
-      isCurrent,
-      summary,
-    };
+      effectiveFrom,
+      // The new row inherits whatever the predecessor's end was: null when
+      // splicing onto the end, or the predecessor's old end when back-dating
+      // into the middle of the history.
+      effectiveTo: previous.effectiveTo,
+      annualBaseUsdMinor,
+      changeReason: prepared.changeReason,
+      note: prepared.note,
+      changedByUserId: actorUserId,
+      createdAt: now,
+    });
+    isCurrent = previous.effectiveTo === null;
+  }
+
+  if (isCurrent) {
+    setCurrentCompensation(tx, employee.id, compensationId, now);
+  }
+
+  const change = percentChange(previous.baseSalaryMinor, baseSalaryMinor);
+  const summary = describeRevision({
+    employeeName: `${employee.firstName} ${employee.lastName}`,
+    currency: employee.currency,
+    fromMinor: previous.baseSalaryMinor,
+    toMinorAmount: baseSalaryMinor,
+    change,
+    effectiveFrom,
+    reason: prepared.changeReason,
   });
+
+  insertAuditEntry(tx, {
+    actorUserId,
+    entity: 'COMPENSATION',
+    entityId: compensationId,
+    action: prepared.changeReason === 'IMPORT' ? 'IMPORT' : 'SALARY_REVISION',
+    beforeJson: JSON.stringify({
+      baseSalaryMinor: previous.baseSalaryMinor,
+      currency: previous.currency,
+      effectiveFrom: previous.effectiveFrom,
+      effectiveTo: previous.effectiveTo,
+      changeReason: previous.changeReason,
+    }),
+    afterJson: JSON.stringify({
+      employeeId: employee.id,
+      baseSalaryMinor,
+      currency: employee.currency,
+      effectiveFrom,
+      annualBaseUsdMinor,
+      changeReason: prepared.changeReason,
+      note: prepared.note,
+    }),
+    summary,
+    at: now,
+  });
+
+  return {
+    compensationId,
+    previousSalaryMinor: previous.baseSalaryMinor,
+    newSalaryMinor: baseSalaryMinor,
+    currency: employee.currency,
+    percentChange: change,
+    effectiveFrom,
+    isCurrent,
+    summary,
+  };
+}
+
+export function reviseSalary(
+  db: AppDatabase,
+  input: RevisionInput,
+  actorUserId: number,
+  clock: Clock = systemClock,
+): RevisionResult {
+  const prepared = prepareRevision(db, input, clock);
+  return db.transaction((tx) => commitRevision(tx, prepared, actorUserId, clock.now()));
 }
 
 function describeRevision(details: {
