@@ -162,9 +162,14 @@ let sequence = 0;
  * compensation row, then the pointer — so no foreign key is ever unsatisfied.
  */
 export function addEmployee(context: TestContext, spec: EmployeeSpec = {}): number {
+  // Advanced unconditionally: putting `++sequence` in the lastName default meant
+  // it only moved when the caller omitted a name, so any test that supplied one
+  // reused the previous employee code and collided on the unique email.
+  const ordinal = ++sequence;
+
   const {
     firstName = 'Test',
-    lastName = `Person${++sequence}`,
+    lastName = `Person${ordinal}`,
     department = 'Engineering',
     level = 'L2',
     country = 'US',
@@ -178,7 +183,7 @@ export function addEmployee(context: TestContext, spec: EmployeeSpec = {}): numb
   const currency = context.currencyOf(country);
   const salaryMajor = spec.salaryMajor ?? bandMidMajor(level, country);
   const salaryMinor = toMinor(salaryMajor, currency);
-  const code = `T-${String(sequence).padStart(5, '0')}`;
+  const code = `T-${String(ordinal).padStart(5, '0')}`;
 
   const employeeId = Number(
     context.sqlite
