@@ -1,0 +1,49 @@
+# Render blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploys on the free instance type, which has an ephemeral filesystem. That is
+# a deliberate choice, not an oversight: the database does not survive a
+# spin-down, and scripts/boot.ts rebuilds it from the deterministic seed on
+# every cold start, so the demo always comes up in a known-good state at no cost.
+#
+# To make it durable: change `plan` to `starter`, add the `disk` block commented
+# out below, and point DATABASE_PATH at the mount. Nothing in the application
+# changes — boot.ts is a no-op when the database already holds data.
+
+services:
+  - type: web
+    name: acme-salary-management
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+
+    # --include=dev is required, not incidental. `next build` needs TypeScript,
+    # Tailwind and the type packages, and boot.ts runs through tsx. Render sets
+    # NODE_ENV=production, which would otherwise make npm skip all of them.
+    buildCommand: npm ci --include=dev && npm run build
+
+    # Migrate and seed before serving, so the app never comes up against an
+    # empty database.
+    startCommand: npm run boot && npm start
+
+    healthCheckPath: /login
+
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: DATABASE_PATH
+        # /tmp is writable on the free instance type. It is also wiped on
+        # restart, which is what boot.ts compensates for.
+        value: /tmp/acme-salary.db
+      # Uncomment on a real deployment holding real salary data: it stops the
+      # login screen from prefilling and displaying the demo account.
+      # - key: HIDE_DEMO_CREDENTIALS
+      #   value: 'true'
+
+    # ---- durable variant --------------------------------------------------
+    # plan: starter
+    # disk:
+    #   name: salary-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # and set DATABASE_PATH to /var/data/acme-salary.db

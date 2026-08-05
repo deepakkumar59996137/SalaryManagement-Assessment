@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.claude
+data
+docs/screenshots
+test-results
+playwright-report
+coverage
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env*.local
+npm-debug.log*
