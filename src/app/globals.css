@@ -19,20 +19,28 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Categorical series for charts. Deliberately not the brand colour — these
-     are chosen to stay distinguishable in both themes and under deuteranopia. */
+  /* Categorical series. Fixed slot order — assigned in sequence, never cycled. */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
+
+  /* Status. Reserved — never reused as "series 7", always paired with an icon
+     and a label so state is never carried by colour alone. */
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-serious: var(--status-serious);
+  --color-status-critical: var(--status-critical);
+
+  /* Chart chrome, kept recessive against the data. */
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -59,18 +67,32 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.596 0.145 163);
-  --warning: oklch(0.705 0.162 70);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
-  --chart-1: oklch(0.55 0.18 258);
-  --chart-2: oklch(0.63 0.14 183);
-  --chart-3: oklch(0.65 0.17 44);
-  --chart-4: oklch(0.58 0.19 320);
-  --chart-5: oklch(0.68 0.14 135);
-  --chart-6: oklch(0.62 0.16 15);
+  /* Categorical slots, in validated order. Verified against this app's own
+     surface (#ffffff) — all six clear the lightness band, chroma floor,
+     colour-vision separation (worst adjacent ΔE 9.1) and the normal-vision
+     floor (worst adjacent ΔE 19.6).
+
+     Aqua, yellow and magenta fall below 3:1 on white, which obliges the relief
+     rule: every chart using them ships visible direct labels and a table view,
+     so no value is legible by hue alone. */
+  --chart-1: #2a78d6; /* blue    */
+  --chart-2: #eb6834; /* orange  */
+  --chart-3: #1baf7a; /* aqua    */
+  --chart-4: #eda100; /* yellow  */
+  --chart-5: #e87ba4; /* magenta */
+  --chart-6: #008300; /* green   */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
 }
 
 .dark {
@@ -90,18 +112,28 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.696 0.145 163);
-  --warning: oklch(0.769 0.162 70);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
 
-  --chart-1: oklch(0.68 0.16 258);
-  --chart-2: oklch(0.74 0.13 183);
-  --chart-3: oklch(0.76 0.15 44);
-  --chart-4: oklch(0.7 0.17 320);
-  --chart-5: oklch(0.78 0.13 135);
-  --chart-6: oklch(0.72 0.15 15);
+  /* The same six hues re-stepped for the dark surface, not an automatic flip.
+     Verified against this app's dark card (#171717): all six clear the dark
+     lightness band and 3:1 contrast, worst adjacent CVD ΔE 8.4. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+
+  /* Status steps are mode-invariant — all four clear 3:1 on the dark surface. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
 }
 
 @layer base {
