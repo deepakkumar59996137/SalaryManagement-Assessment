@@ -1,0 +1,81 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import Database, { type Database as SqliteConnection } from 'better-sqlite3';
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import * as schema from './schema';
+import { databaseDirectory, databaseFile } from './paths';
+
+export type AppDatabase = BetterSQLite3Database<typeof schema>;
+
+export interface Connection {
+  readonly db: AppDatabase;
+  /** The raw driver, for pragmas, transactions and the occasional hand-written query. */
+  readonly sqlite: SqliteConnection;
+  readonly close: () => void;
+}
+
+export const MIGRATIONS_FOLDER = path.join(process.cwd(), 'src', 'server', 'db', 'migrations');
+
+function applyPragmas(sqlite: SqliteConnection): void {
+  // Write-ahead logging: readers do not block the writer. Irrelevant for
+  // in-memory databases, where SQLite quietly keeps the default.
+  sqlite.pragma('journal_mode = WAL');
+  // Off by default in SQLite. Without it the schema's foreign keys are decoration.
+  sqlite.pragma('foreign_keys = ON');
+  // Wait rather than failing immediately if another connection holds the write lock.
+  sqlite.pragma('busy_timeout = 5000');
+}
+
+export function openConnection(file: string): Connection {
+  const sqlite = new Database(file);
+  applyPragmas(sqlite);
+
+  return {
+    sqlite,
+    db: drizzle(sqlite, { schema }),
+    close: () => sqlite.close(),
+  };
+}
+
+/**
+ * A fresh, isolated database in memory with all migrations applied.
+ *
+ * Used by every integration test. Because `better-sqlite3` is synchronous and
+ * in-process, this costs about a millisecond — which is why the tests run
+ * against a real database engine rather than a mock of one.
+ */
+export function openInMemory(): Connection {
+  const connection = openConnection(':memory:');
+  migrate(connection.db, { migrationsFolder: MIGRATIONS_FOLDER });
+  return connection;
+}
+
+/** Apply any pending migrations to an existing connection. */
+export function runMigrations(connection: Connection): void {
+  migrate(connection.db, { migrationsFolder: MIGRATIONS_FOLDER });
+}
+
+// ---------------------------------------------------------------------------
+// Application singleton
+// ---------------------------------------------------------------------------
+
+/**
+ * Cached on globalThis so Next.js hot reloads reuse one connection instead of
+ * opening a new file handle on every edit.
+ */
+const globalForDb = globalThis as unknown as { __salaryDb?: Connection };
+
+export function getConnection(): Connection {
+  if (!globalForDb.__salaryDb) {
+    fs.mkdirSync(databaseDirectory(), { recursive: true });
+    globalForDb.__salaryDb = openConnection(databaseFile());
+  }
+  return globalForDb.__salaryDb;
+}
+
+export function getDb(): AppDatabase {
+  return getConnection().db;
+}
+
+export { schema };
