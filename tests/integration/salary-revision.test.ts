@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ChangeReasonCode } from '@/domain/compensation';
 import { intervalsOverlap } from '@/domain/dates';
 import { ConflictError, NotFoundError, ValidationError } from '@/server/http/errors';
 import { countAuditEntries, findAuditEntries } from '@/server/repositories/audit.repository';
@@ -54,7 +55,12 @@ function assertHistoryIsSound(employeeId: number) {
   expect(pointer.id).toBe(open[0]!.id);
 }
 
-const revise = (employeeId: number, salaryMajor: number, effectiveFrom: string, reason = 'MERIT' as const) =>
+const revise = (
+  employeeId: number,
+  salaryMajor: number,
+  effectiveFrom: string,
+  reason: ChangeReasonCode = 'MERIT',
+) =>
   reviseSalary(
     context.db,
     { employeeId, baseSalaryMajor: salaryMajor, effectiveFrom, changeReason: reason },
