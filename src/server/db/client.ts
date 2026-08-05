@@ -6,7 +6,23 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema';
 import { databaseDirectory, databaseFile } from './paths';
 
+/**
+ * The query-builder surface. Deliberately does not include the driver's
+ * `$client`, because a transaction handle does not have one — typing it in
+ * would make every repository unusable inside a transaction.
+ */
 export type AppDatabase = BetterSQLite3Database<typeof schema>;
+
+/**
+ * The raw driver, for the analytics repository.
+ *
+ * Its queries are window functions and recursive CTEs, which the builder
+ * cannot express and which read better as SQL anyway. Passing the driver
+ * explicitly rather than reaching through the ORM keeps that visible in the
+ * signature: these functions run hand-written SQL, and they never run inside
+ * a transaction.
+ */
+export type RawDatabase = SqliteConnection;
 
 export interface Connection {
   readonly db: AppDatabase;
@@ -76,6 +92,10 @@ export function getConnection(): Connection {
 
 export function getDb(): AppDatabase {
   return getConnection().db;
+}
+
+export function getRawDb(): RawDatabase {
+  return getConnection().sqlite;
 }
 
 export { schema };

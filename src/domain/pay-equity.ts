@@ -74,6 +74,31 @@ export function unadjustedGap(
   };
 }
 
+/**
+ * Build a gap from medians and means the database already computed.
+ *
+ * The counterpart to `unadjustedGap` for the ten-thousand-row case, where
+ * ranking in SQL is far cheaper than shipping every salary to JavaScript.
+ * Both end at the same formula.
+ */
+export function payGapFrom(stats: {
+  maleMedian: number | null;
+  femaleMedian: number | null;
+  maleMean: number | null;
+  femaleMean: number | null;
+  maleCount: number;
+  femaleCount: number;
+}): PayGap {
+  return {
+    medianGap: gapBetween(stats.maleMedian, stats.femaleMedian),
+    meanGap: gapBetween(stats.maleMean, stats.femaleMean),
+    maleCount: stats.maleCount,
+    femaleCount: stats.femaleCount,
+    maleMedian: stats.maleMedian,
+    femaleMedian: stats.femaleMedian,
+  };
+}
+
 export interface Cohort {
   /** Human-readable identity of the comparison group, e.g. "Engineering · L4". */
   readonly key: string;
@@ -99,6 +124,26 @@ export interface LikeForLikeResult {
 }
 
 /**
+ * A cohort reduced to the numbers the gap maths actually needs.
+ *
+ * The database can compute medians and counts per (department, level) with a
+ * window function far more cheaply than JavaScript can over ten thousand rows,
+ * so the analytics layer hands the already-aggregated form straight to
+ * `likeForLikeFromSummaries`. `likeForLikeGap` below is the array-shaped
+ * convenience for small inputs — both share one implementation of the
+ * weighting and exclusion rules, so the two paths cannot disagree.
+ */
+export interface CohortSummary {
+  readonly key: string;
+  readonly maleMedian: number | null;
+  readonly femaleMedian: number | null;
+  readonly maleMean: number | null;
+  readonly femaleMean: number | null;
+  readonly maleCount: number;
+  readonly femaleCount: number;
+}
+
+/**
  * Like-for-like gap: compare within cohorts, then weight by cohort size.
  *
  * Cohorts with fewer than `minimumPerGroup` of either gender are excluded, for
@@ -106,31 +151,37 @@ export interface LikeForLikeResult {
  * practically, publishing a pay comparison for a cohort of one identifies that
  * person's salary to anyone who knows the org chart.
  */
-export function likeForLikeGap(
-  cohorts: readonly Cohort[],
+export function likeForLikeFromSummaries(
+  summaries: readonly CohortSummary[],
   minimumPerGroup = 3,
 ): LikeForLikeResult {
   const included: CohortGap[] = [];
   let excludedHeadcount = 0;
 
-  for (const cohort of cohorts) {
-    const headcount = cohort.maleSalaries.length + cohort.femaleSalaries.length;
+  for (const cohort of summaries) {
+    const headcount = cohort.maleCount + cohort.femaleCount;
 
-    if (
-      cohort.maleSalaries.length < minimumPerGroup ||
-      cohort.femaleSalaries.length < minimumPerGroup
-    ) {
+    if (cohort.maleCount < minimumPerGroup || cohort.femaleCount < minimumPerGroup) {
       excludedHeadcount += headcount;
       continue;
     }
 
-    const gap = unadjustedGap(cohort.maleSalaries, cohort.femaleSalaries);
-    if (gap.medianGap === null) {
+    const medianGap = gapBetween(cohort.maleMedian, cohort.femaleMedian);
+    if (medianGap === null) {
       excludedHeadcount += headcount;
       continue;
     }
 
-    included.push({ ...gap, key: cohort.key, headcount });
+    included.push({
+      key: cohort.key,
+      headcount,
+      medianGap,
+      meanGap: gapBetween(cohort.maleMean, cohort.femaleMean),
+      maleCount: cohort.maleCount,
+      femaleCount: cohort.femaleCount,
+      maleMedian: cohort.maleMedian,
+      femaleMedian: cohort.femaleMedian,
+    });
   }
 
   const coveredHeadcount = included.reduce((total, cohort) => total + cohort.headcount, 0);
@@ -154,6 +205,28 @@ export function likeForLikeGap(
     excludedHeadcount,
     coverage: totalHeadcount === 0 ? null : coveredHeadcount / totalHeadcount,
   };
+}
+
+/** Array-shaped convenience for small inputs and tests. Same rules throughout. */
+export function likeForLikeGap(
+  cohorts: readonly Cohort[],
+  minimumPerGroup = 3,
+): LikeForLikeResult {
+  return likeForLikeFromSummaries(
+    cohorts.map((cohort) => {
+      const gap = unadjustedGap(cohort.maleSalaries, cohort.femaleSalaries);
+      return {
+        key: cohort.key,
+        maleMedian: gap.maleMedian,
+        femaleMedian: gap.femaleMedian,
+        maleMean: average(cohort.maleSalaries),
+        femaleMean: average(cohort.femaleSalaries),
+        maleCount: gap.maleCount,
+        femaleCount: gap.femaleCount,
+      };
+    }),
+    minimumPerGroup,
+  );
 }
 
 /**

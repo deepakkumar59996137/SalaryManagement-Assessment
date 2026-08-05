@@ -11,6 +11,7 @@ import {
   maxDate,
   minDate,
   monthOf,
+  startOfQuarter,
   startOfYear,
 } from '@/domain/dates';
 
@@ -132,5 +133,15 @@ describe('intervalsOverlap', () => {
 
   it('sees an overlap when an open interval swallows a later one', () => {
     expect(intervalsOverlap('2026-01-01', null, '2027-01-01', '2027-06-30')).toBe(true);
+  });
+});
+
+describe('startOfQuarter', () => {
+  it('snaps back to the first day of the containing quarter', () => {
+    expect(startOfQuarter('2026-01-01')).toBe('2026-01-01');
+    expect(startOfQuarter('2026-02-14')).toBe('2026-01-01');
+    expect(startOfQuarter('2026-06-01')).toBe('2026-04-01');
+    expect(startOfQuarter('2026-09-30')).toBe('2026-07-01');
+    expect(startOfQuarter('2026-12-31')).toBe('2026-10-01');
   });
 });

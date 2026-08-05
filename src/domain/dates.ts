@@ -134,6 +134,22 @@ export function startOfYear(date: IsoDate): IsoDate {
 }
 
 /**
+ * Start of the calendar quarter containing `date`.
+ *
+ * Trend series are anchored to real quarters rather than counted back from
+ * today, so the axis reads Jan / Apr / Jul / Oct — the periods an HR Manager
+ * actually reports on — instead of whichever months happen to fall three apart
+ * from the day the page was opened.
+ */
+export function startOfQuarter(date: IsoDate): IsoDate {
+  const iso = assertIsoDate(date);
+  const month = Number(iso.slice(5, 7));
+  const quarterStart = Math.floor((month - 1) / 3) * 3 + 1;
+
+  return `${iso.slice(0, 4)}-${String(quarterStart).padStart(2, '0')}-01`;
+}
+
+/**
  * A source of "now", injected rather than read from the system clock.
  *
  * Every service that needs the current time takes one of these, so tests pin
