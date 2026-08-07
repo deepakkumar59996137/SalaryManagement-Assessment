@@ -32,15 +32,37 @@ From the Railway dashboard:
 
 1. **New Project → Deploy from GitHub repo**, pick this repository. Railway reads
    `railway.json`, sees the Dockerfile, and starts building.
-2. **Settings → Volumes → Add volume**, mount path **`/data`**. Do this *before*
-   the first successful deploy if you can — otherwise the first boot seeds into
-   the container filesystem and is lost when the volume is attached.
+2. **Attach a volume.** This is done from the **project canvas**, not from the
+   service settings: right-click empty canvas space (or press `Ctrl/⌘ + K` and
+   type `volume`), choose the volume option, and select this service. Only once
+   a volume is attached does a **Volumes** section appear under
+   **service → Settings** — set its mount path to **`/data`** there.
 3. **Variables**, add `DATABASE_PATH=/data/acme-salary.db`. The Dockerfile already
    defaults to this, so it is belt-and-braces, but being explicit means the value
    is visible in the dashboard rather than buried in an image.
 4. **Settings → Networking → Generate Domain** for a public URL.
+5. **Redeploy**, then restart once and confirm the logs say
+   *"Database already holds 10,000 employees — leaving it alone."* That message
+   is the proof the volume is persisting; without it the data is living in the
+   container filesystem and will vanish on the next restart.
 
 `PORT` is injected by Railway and read at runtime; nothing needs setting for it.
+
+Two details that cost time if unknown:
+
+- **`/data` must be absolute, and is.** Railway places application files under
+  `/app`, so a service writing to a *relative* `./data` would need the volume
+  mounted at `/app/data`. `DATABASE_PATH` here is an absolute `/data/...`, so
+  `/data` is the correct mount point.
+- **Volumes mount at container start, not during build.** The seed runs from the
+  `CMD`, not from a build step, so it lands on the volume rather than being
+  baked into the image.
+
+Attaching the volume after the first deploy is harmless: the empty volume
+replaces `/data`, the next boot finds no employees and re-seeds. Nothing is lost,
+because the seed is deterministic and produces the identical dataset.
+
+Free-plan limits are 0.5 GB and one volume per project; the database is ~7 MB.
 
 ### Cost
 
