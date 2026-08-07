@@ -163,6 +163,9 @@ required before it held anyone's actual pay:
 
 ## Verifying a deployment
 
+The live deployment is at
+<https://salarymanagement-assessment-production.up.railway.app>.
+
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://YOUR-URL/login          # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://YOUR-URL/dashboard      # 307 → /login
@@ -171,3 +174,27 @@ curl -s -o /dev/null -w '%{http_code}\n' https://YOUR-URL/dashboard      # 307 �
 Then sign in and confirm the dashboard reads **$713M annual payroll across 9,620
 employees**. Those figures are deterministic, so anything else means the seed did
 not run.
+
+**Probe every route, not just the home page.** Two ignore-pattern bugs — one in
+`.gitignore`, one in `.dockerignore` — once removed the CSV import screen and its
+two API routes from the deployed image while everything else worked perfectly.
+A single check of `/login` would have missed it entirely:
+
+```bash
+for p in /login /dashboard /employees /analytics /data /audit /api/data/export; do
+  printf '%-20s %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' "https://YOUR-URL$p")"
+done
+```
+
+Signed out, expect `200` for `/login` and `307` for the rest. A `404` anywhere
+means that route is not in the build.
+
+**And before deploying at all, build from a clean clone**, not from the working
+directory:
+
+```bash
+git clone <repo> /tmp/check && cd /tmp/check && npm install && npm run build
+```
+
+That is the check that catches a file which exists on your machine and has never
+been committed. Tests passing locally does not.

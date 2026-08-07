@@ -49,6 +49,23 @@ boot. That tradeoff was surfaced rather than silently resolved.
 These are the moments where the output was wrong, and where the fix came from
 measuring or checking rather than from generating more:
 
+- **A `.gitignore` rule silently deleted a feature from the repository.** The
+  worst one, and it survived seventeen commits. `data/` was written to ignore
+  the generated SQLite directory; git matches an unanchored pattern at *any*
+  depth, so it also excluded `src/app/(app)/data`, `src/app/api/data` and
+  `src/components/data`. The CSV import screen and both its route handlers were
+  never committed. Nothing complained: `git add -A` reported success, the commit
+  went through, every test passed, and `npm run build` succeeded — all of them
+  reading files from the working directory rather than from git. Then the same
+  word in `.dockerignore` did it a second time, stripping the files back out of
+  the build context *after* the first fix put them into the repo. It surfaced
+  only as a 404 on the deployed site.
+
+  The lesson is specific and worth keeping: **a green test suite says nothing
+  about what is actually in your repository.** The check that catches this is
+  cloning into an empty directory and building there, and it should have run
+  before the deployment was called done rather than after a user reported a 404.
+
 - **Performance budgets were invented, not measured.** The first version of
   `scripts/benchmark.ts` asserted 100 ms per analytics aggregate and 300 ms per
   page. Reality was two to three times that. The correct response was not to

@@ -4,6 +4,11 @@ Salary management for a 10,000-employee, multi-country organisation, built for a
 **HR Manager** replacing spreadsheets — and, more to the point, built to answer
 questions about how the organisation pays people.
 
+### ▶ [Live demo](https://salarymanagement-assessment-production.up.railway.app)
+
+Sign in with **`hr.manager@acme.example`** / **`DemoPass!2026`** — the form is
+prefilled, so the button is enough. All 10,000 employee records are synthetic.
+
 ![Dashboard](docs/screenshots/02-dashboard.png)
 
 ## The question this is really about
@@ -29,16 +34,26 @@ women are 48.1% of the most junior level and 28.8% of the most senior.
 That is a finding rather than a figure, and producing it is the point of the
 software.
 
-## Try it
+## Run it locally
 
 ```bash
 npm install && npm run db:migrate && npm run seed && npm run dev
 ```
 
-Sign in with **`hr.manager@acme.example`** / **`DemoPass!2026`**.
+Then <http://localhost:3000>, same credentials as above. Seeding takes about four
+seconds and is deterministic — run it twice and you get an identical database.
 
-All 10,000 employee records are synthetic and generated deterministically —
-seeding twice produces an identical database.
+> **On Windows without C++ build tools**, `npm install` fails: npm automatically
+> runs `node-gyp rebuild` for any package with a `binding.gyp` and no install
+> script, which `better-sqlite3` has. The compilation is unnecessary — v13 ships
+> prebuilt binaries for every platform inside the package — so skip it:
+>
+> ```bash
+> npm install --ignore-scripts && npx playwright install chromium
+> ```
+>
+> The second command is only needed for `npm run test:e2e`. Linux, macOS and the
+> Docker image are unaffected.
 
 ## What it does
 
