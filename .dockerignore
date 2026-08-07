@@ -1,17 +1,31 @@
+# Deliberately NO bare `data` entry.
+#
+# It was here to keep the local SQLite directory out of the image, and it also
+# excluded src/app/(app)/data, src/app/api/data and src/components/data — so the
+# CSV import/export screen 404'd in production while working locally.
+#
+# Unlike .gitignore, a leading slash does not fix this: Docker disregards
+# leading and trailing slashes in ignore patterns, so `/data` and `data` mean
+# the same thing. The `*.db*` patterns below already keep the database itself
+# out at any depth, which is all that was ever needed.
+
 node_modules
 .next
 .git
 .github
 .claude
-data
 docs/screenshots
 test-results
 playwright-report
 coverage
+
+# The database, wherever it lives. This is what `data` was really for.
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
+
 .env
 .env*.local
 npm-debug.log*
+
