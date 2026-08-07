@@ -26,15 +26,21 @@ COPY . .
 RUN npm run build
 
 ENV NODE_ENV=production
-ENV PORT=3000
-# Overridden by a volume mount on a durable deployment.
+# Where the SQLite file lives. Mount a volume here and the data persists;
+# without one this directory is part of the container and is lost on restart.
 ENV DATABASE_PATH=/data/acme-salary.db
 
 RUN mkdir -p /data
-VOLUME ["/data"]
+
+# Deliberately no VOLUME directive: Railway and most hosts mount their own
+# volume at this path, and an anonymous Docker volume declared here would only
+# add a second, confusing one on hosts that honour it.
 
 EXPOSE 3000
 
-# Migrate, seed if empty, then serve. Seeding is skipped when a volume already
-# holds data, so mounting one is all that is needed to make this durable.
-CMD ["sh", "-c", "npm run boot && npm start"]
+# Migrate, seed if empty, then serve.
+#
+# The host chooses the port — Railway, Fly and Render all inject PORT — so it is
+# read at runtime rather than baked in, with a local default. Binding 0.0.0.0
+# rather than localhost is what makes the container reachable from outside it.
+CMD ["sh", "-c", "npm run boot && npx next start -H 0.0.0.0 -p ${PORT:-3000}"]

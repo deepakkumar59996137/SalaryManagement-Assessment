@@ -18,7 +18,46 @@ demo and a durable deployment. On an ephemeral filesystem it rebuilds a
 known-good 10,000-employee dataset on every cold start; on a mounted volume it
 does nothing after the first boot.
 
-## Render (the intended target)
+## Railway (the current deployment)
+
+Railway runs the whole application as one container from the [`Dockerfile`](../Dockerfile),
+with a volume so the database survives restarts. [`railway.json`](../railway.json)
+pins the builder, the health check and — importantly — a single replica.
+
+**One replica is not a default worth changing.** SQLite allows one writer, and a
+Railway volume attaches to one instance, so a second replica would either fail to
+start or corrupt state.
+
+From the Railway dashboard:
+
+1. **New Project → Deploy from GitHub repo**, pick this repository. Railway reads
+   `railway.json`, sees the Dockerfile, and starts building.
+2. **Settings → Volumes → Add volume**, mount path **`/data`**. Do this *before*
+   the first successful deploy if you can — otherwise the first boot seeds into
+   the container filesystem and is lost when the volume is attached.
+3. **Variables**, add `DATABASE_PATH=/data/acme-salary.db`. The Dockerfile already
+   defaults to this, so it is belt-and-braces, but being explicit means the value
+   is visible in the dashboard rather than buried in an image.
+4. **Settings → Networking → Generate Domain** for a public URL.
+
+`PORT` is injected by Railway and read at runtime; nothing needs setting for it.
+
+### Cost
+
+Railway has no perpetual free tier. A new account gets a **one-time $5 trial
+credit**, after which the Free plan grants $1/month — not enough to keep a
+service always-on. A small always-on instance runs at roughly $5/month, so the
+trial covers about a month. That is sufficient for an assessment review window
+and will stop afterwards unless the $5/month Hobby plan is added.
+
+Render's free tier (below) is the option that stays free indefinitely, at the
+cost of cold starts and non-persistent data.
+
+## Render (the free alternative)
+
+Kept as a working alternative: genuinely free with no expiry, at the cost of a
+~1 minute cold start after 15 minutes of inactivity and a database that resets
+with it.
 
 [`render.yaml`](../render.yaml) is a complete blueprint. From the Render
 dashboard: **New → Blueprint**, point it at this repository, apply.
